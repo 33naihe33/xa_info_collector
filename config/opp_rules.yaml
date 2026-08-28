@@ -1,0 +1,196 @@
+# config/opp_rules.yaml
+# 商机研判规则 — 6大业务条线。改这里不改代码。
+# 数据来源：用户提供的《数据抓取关键词和事件》文档（6条线版）
+
+business_lines:
+  corporate: "对公+跨境+普惠（企业端）"
+  retail: "对私（个人金融）"
+  operations: "营运+数币（运营服务）"
+  fintech: "金融科技"
+  synergy: "综合条线"
+  risk_control: "风控条线"
+
+# 规则预筛信号词：命中任一关键词的文档才调 LLM（控制成本）
+pre_filter_keywords:
+  # 对公+跨境+普惠
+  - "疏解|央企|国企|总部|搬迁|迁入|机构设立|疏解清单"
+  - "新一代信息技术|生命科学|生物技术|新材料|高端服务业|绿色农业|战略性新兴|科技创新"
+  - "重大项目|开工|竣工|投产|产业园区|施工许可|中标|基建|项目建设|重点工程"
+  - "银企对接|授信|签约|投资落地|战略合作"
+  - "CIPS|跨境人民币|外汇便利化|跨境融资|境外贷款|银团|国际结算|贸易融资"
+  - "自贸区|非居民|离岸金融"
+  - "专精特新|小巨人|企业扶持|绿色信贷|碳交易|排污权|碳减排|涉农|农村合作社"
+  # 对私
+  - "人才引进|雄才卡|人才安居|购房补贴|数字人民币消费券|信用卡|租赁住房|人才公寓|安置房|代发工资|交薪通|消费贷"
+  # 营运+数币
+  - "智慧网点|自助设备|网点选址|开业公告|企业开户|账户开立|清装钞|ATM"
+  - "数字人民币|数币|智能合约|财政补贴发放|数币科创券|数币企业补贴|一类钱包|二类钱包|三代社保卡"
+  - "公交出行|停车支付|食堂超市|商圈消费|文旅消费|白洋淀"
+  # 科技
+  - "实验室|研究中心|创新中心|孵化器|加速器|区块链|人工智能|大数据|云计算|物联网|数字孪生"
+  - "5G基站|数据中心|算力中心|智能交通|数字道路|产学研|科技成果转化"
+  # 综合
+  - "党建共建|金融知识普及|金融服务进|银企对接会|产品推介会|表彰|锦旗"
+  # 风控
+  - "金融监管|试点政策|合规创新|信用体系|信用承诺|信用评价|反洗钱|反欺诈|消费者权益"
+  # 通用金融信号（跨条线）
+  - "投资|融资|贷款|授信|存款|开户|结算|发债|招商|落地|签约|入驻"
+
+opportunity_types:
+  # 一、对公+跨境+普惠条线（企业端）
+  corporate_relocation:
+    line: corporate
+    signals: ["央企入驻|国企搬迁|非首都功能疏解|总部迁入|机构设立|疏解清单"]
+    products: ["对公开户", "综合授信", "结算", "投行业务"]
+  corporate_industry:
+    line: corporate
+    signals: ["新一代信息技术|生命科学|生物技术|新材料|高端服务业|绿色农业|战略性新兴|科技创新"]
+    products: ["项目贷款", "供应链金融", "投贷联动"]
+  corporate_construction:
+    line: corporate
+    signals: ["重大项目开工|产业园区启用|工程中标|施工许可|基建项目"]
+    products: ["项目贷款", "银团贷款", "保函"]
+  corporate_cooperation:
+    line: corporate
+    signals: ["银企对接|金融合作意向|授信签约|投资落地|战略合作协议"]
+    products: ["综合授信", "银团贷款", "债券承销"]
+  cross_border_payment:
+    line: corporate
+    signals: ["CIPS系统|跨境人民币|外汇便利化|跨境融资"]
+    products: ["跨境人民币结算", "外汇避险", "跨境融资"]
+  cross_border_international:
+    line: corporate
+    signals: ["境外贷款|银团贷款|国际结算|贸易融资"]
+    products: ["国际结算", "贸易融资", "保函", "信用证"]
+  cross_border_ftz:
+    line: corporate
+    signals: ["自贸区政策|非居民业务|离岸金融"]
+    products: ["FT账户", "离岸金融", "非居民业务"]
+  inclusive_sme:
+    line: corporate
+    signals: ["科技创新企业|专精特新|小巨人|企业扶持贷款"]
+    products: ["科创贷", "专精特新贷", "知识产权质押"]
+  inclusive_green:
+    line: corporate
+    signals: ["碳交易|排污权|绿色信贷|碳减排支持工具"]
+    products: ["绿色信贷", "碳减排贷款", "排污权质押"]
+  inclusive_agri:
+    line: corporate
+    signals: ["涉农补贴|农业企业|农村合作社"]
+    products: ["涉农贷款", "农业供应链金融"]
+
+  # 二、对私条线（个人金融）
+  retail_talent:
+    line: retail
+    signals: ["人才引进|人才政策|雄才卡|人才安居|人才购房补贴"]
+    products: ["人才安居贷", "购房补贴代发", "私行服务"]
+  retail_consumption:
+    line: retail
+    signals: ["数字人民币消费券|商圈活动|消费补贴|信用卡活动"]
+    products: ["信用卡", "消费贷", "数字人民币"]
+  retail_housing:
+    line: retail
+    signals: ["租赁住房|人才公寓|安置房交付|商品房限购"]
+    products: ["个人住房贷款", "公积金", "租房分期"]
+  retail_banking:
+    line: retail
+    signals: ["代发工资|交薪通|个人贷款|消费贷"]
+    products: ["代发工资", "消费贷", "借记卡"]
+
+  # 三、营运+数币条线（运营服务）
+  ops_branch:
+    line: operations
+    signals: ["智慧网点|自助设备|布放计划|网点选址|开业公告"]
+    products: ["网点服务", "智能柜台"]
+  ops_account:
+    line: operations
+    signals: ["企业开户|银行账户开立|对公账户服务|一网通办"]
+    products: ["对公开户", "账户服务"]
+  ops_cash:
+    line: operations
+    signals: ["清装钞|现金调拨|ATM布设"]
+    products: ["现金管理", "ATM服务"]
+  dcep_scenario:
+    line: operations
+    signals: ["公交出行|停车支付|食堂超市|商圈消费|文旅消费|白洋淀"]
+    products: ["数字人民币收单", "数币结算"]
+  dcep_product:
+    line: operations
+    signals: ["数字人民币红包|消费券|智能合约|财政补贴发放|数币科创券|数币企业补贴"]
+    products: ["数币红包", "智能合约", "补贴代发"]
+  dcep_promotion:
+    line: operations
+    signals: ["数币场景覆盖率|一类钱包|二类钱包|三代社保卡|一卡通"]
+    products: ["数币钱包", "社保卡金融"]
+
+  # 四、科技条线（金融科技）
+  fintech_platform:
+    line: fintech
+    signals: ["实验室|研究中心|创新中心|孵化器|加速器"]
+    products: ["科创贷", "投贷联动"]
+  fintech_tech:
+    line: fintech
+    signals: ["区块链|人工智能|大数据|云计算|物联网|数字孪生"]
+    products: ["科技金融", "数据融资"]
+  fintech_infra:
+    line: fintech
+    signals: ["5G基站|数据中心|算力中心|智能交通|数字道路"]
+    products: ["项目贷款", "设备融资租赁"]
+  fintech_cooperation:
+    line: fintech
+    signals: ["产学研合作|技术合作签约|科技成果转化"]
+    products: ["投贷联动", "科技金融服务"]
+
+  # 五、综合条线（协同联动）
+  synergy_party:
+    line: synergy
+    signals: ["党建共建|主题党日|红色教育"]
+    products: ["党建共建", "综合金融服务"]
+  synergy_publicity:
+    line: synergy
+    signals: ["金融知识普及|金融服务进社区|金融服务进校园|金融服务进企业"]
+    products: ["品牌宣传", "社区金融"]
+  synergy_event:
+    line: synergy
+    signals: ["银企对接会|金融产品推介会|服务启动仪式"]
+    products: ["综合金融服务", "产品推介"]
+  synergy_honor:
+    line: synergy
+    signals: ["获奖表彰|服务之星|锦旗致谢"]
+    products: ["品牌价值"]
+
+  # 六、风控条线
+  risk_regulation:
+    line: risk_control
+    signals: ["金融监管政策|试点政策落地|合规创新"]
+    products: ["合规咨询", "监管沙盒"]
+  risk_credit:
+    line: risk_control
+    signals: ["信用体系建设|信用承诺制|信用评价|信易贷"]
+    products: ["信易贷", "信用评价服务"]
+  risk_prevention:
+    line: risk_control
+    signals: ["房地产风险|隐性债务|金融科技风险"]
+    products: ["风险预警", "合规管理"]
+  risk_compliance:
+    line: risk_control
+    signals: ["反洗钱|反欺诈|金融消费者权益保护"]
+    products: ["反洗钱服务", "合规管理"]
+
+# 优先级判定规则
+priority_rules:
+  critical:
+    conditions: ["央企总部疏解", "张国华书记调研接待企业", "重大签约仪式"]
+  high:
+    conditions: ["重点项目开工", "战略合作签约", "专项政策发布", "领导出席活动"]
+  medium:
+    conditions: ["有明确业务价值"]
+  low:
+    conditions: ["弱信号|远期|信息不全"]
+
+# 重点跟踪人物
+key_figures:
+  - "张国华"
+  - "新区领导"
+
+model: "glm-4-flash"

@@ -1,0 +1,109 @@
+# 每个数据源的配置。新增数据源只改这里。
+sources:
+  xiongan_portal:
+    name: "中国雄安官网"
+    base_url: "https://www.xiongan.gov.cn"
+    # 栏目配置：每个栏目有列表页URL和 datasource JSON 路径
+    categories:
+      zxyw:
+        name: "最新要闻"
+        list_url: "/xaxw/zxyw.html"
+        datasource_path: "/xaxw/ds_faa2cd6debde4c7bbacb8352bc94a894.json"
+      zcwj:
+        name: "政策文件"
+        list_url: "/zcwj.html"
+        datasource_path: "/ds_381eecba9aa042aeaf418a63c376698d.json"
+      tzgg:
+        name: "通知公告"
+        list_url: "/tzgg.html"
+        datasource_path: null  # 探测时未拿到，运行时动态发现
+    enabled: true
+    qps: 2  # 每秒最多2个请求，礼貌限速
+
+  # === HTML 列表页爬虫（无 JSON API，直接解析静态 HTML）===
+  rmxiongan:
+    name: "人民雄安网"
+    base_url: "http://www.rmxiongan.com"
+    list_url: "/GB/383581/index.html"   # 即时新闻
+    enabled: true
+    qps: 1                              # 静态站点，更礼貌的限速
+
+  hebccw:
+    name: "长城新媒体雄安频道"
+    base_url: "https://xiongan.hebccw.cn"
+    list_url: "/xaxw/index.shtml"       # 雄安新闻
+    enabled: true
+    qps: 1
+
+  rongcheng_gov:
+    name: "容城县政府"
+    base_url: "https://www.hbrc.gov.cn"
+    list_url: "/news/2/10/1.html"       # 容城动态
+    enabled: true
+    qps: 1
+
+  xiongxian_gov:
+    name: "雄县政府"
+    base_url: "http://www.xiongxian.gov.cn"   # 注意：HTTP 非 HTTPS
+    list_url: "/index.do?view=ejxwzx&ccid=173"   # 雄县要闻
+    enabled: true
+    qps: 1
+
+  anxin_gov:
+    name: "安新县政府"
+    base_url: "https://www.anxin.gov.cn"
+    list_url: "/news/3/10/1.html"       # 安新要闻
+    enabled: true
+    qps: 1
+
+  # === 微信公众号（通过搜狗微信搜索间接获取）===
+  # 注意：搜狗微信搜索有反爬限制，频繁搜索会被临时封IP。
+  # 建议每日最多触发一次，或降低频率。
+  wechat_xiongan_fabu:
+    name: "雄安发布"
+    search_query: "雄安发布"
+    max_results: 10
+    enabled: true
+    qps: 0.2
+
+  wechat_rongcheng_fabu:
+    name: "容城发布"
+    search_query: "容城发布"
+    max_results: 10
+    enabled: true
+    qps: 0.2
+
+  wechat_xiongzhou_voice:
+    name: "雄州之声"
+    search_query: "雄州之声"
+    max_results: 10
+    enabled: true
+    qps: 0.2
+
+  wechat_yanling_voice:
+    name: "雁翎之声"
+    search_query: "雁翎之声"
+    max_results: 10
+    enabled: true
+    qps: 0.2
+
+  wechat_xiongan_edu:
+    name: "雄安教育发布"
+    search_query: "雄安教育发布"
+    max_results: 10
+    enabled: true
+    qps: 0.2
+
+  # # === 预留数据源（后续增量实现）===
+  # public_resource:
+  #   name: "公共资源交易平台"
+  #   enabled: false
+  #   qps: 1
+  # xiongan_group:
+  #   name: "雄安集团采购"
+  #   enabled: false
+  #   qps: 1
+  # county_provincial:
+  #   name: "县区+省级"
+  #   enabled: false
+  #   qps: 1

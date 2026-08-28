@@ -1,0 +1,37 @@
+# config/push_rules.yaml
+# 推送策略配置。改这里不改代码。
+
+# 优先级 → 推送策略映射
+priority_strategy:
+  critical:
+    instant: true        # 立即推送
+    daily_cap: 0         # 0 = 无上限
+  high:
+    instant: true
+    daily_cap: 5         # 每日最多5条
+  medium:
+    instant: false       # 攒入定时摘要
+    daily_cap: 0
+  low:
+    instant: false
+    daily_cap: 0
+
+# 定时摘要计划
+digest_schedule:
+  daily:
+    enabled: true
+    time: "08:00"
+    window_hours: 24     # 汇总过去24小时
+  weekly:
+    enabled: true
+    day: "monday"
+    time: "08:00"
+    window_days: 7
+
+# Web Push VAPID 密钥对（开发环境用，生产应替换）
+# 生成命令：python -c "from py_vapid import Vapid; v = Vapid(); v.generate_keys(); v.save_key('vapid_private.pem'); v.save_public_key('vapid_public_key.pem')"
+# 也可通过环境变量覆盖：VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
+vapid:
+  subject: "mailto:admin@example.com"
+  public_key: ""   # 运行时从环境变量或自动生成加载
+  private_key: ""  # 运行时从环境变量或自动生成加载

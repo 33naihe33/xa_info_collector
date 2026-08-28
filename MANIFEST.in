@@ -1,0 +1,6 @@
+# R-07: 确保前端构建产物随 sdist 分发（wheel 由 package-data 覆盖）
+recursive-include web/frontend/dist *
+
+# 配置文件（yaml + prompts）
+recursive-include config *.yaml
+recursive-include config/prompts *.txt

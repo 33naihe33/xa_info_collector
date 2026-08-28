@@ -1,0 +1,24 @@
+.superpowers/
+__pycache__/
+*.pyc
+.venv/
+data/xac.db
+data/xac.db-*
+data/xac.db.bak*
+data/xac.db.final_bak
+data/xac.db.reaudit_bak*
+data/snapshots/*
+!data/snapshots/.gitkeep
+node_modules/
+dist/
+build/
+*.egg-info/
+.env
+
+# 部署打包排除：生产数据不入库（磁盘保留，仅取消跟踪）
+data/images/
+data/reports/
+data/.DS_Store
+.DS_Store
+.zcode/
+web/frontend/data/
