@@ -8,12 +8,27 @@
 每个公众号配置为一个 source，搜索 query 为公众号名。
 """
 import re
+from datetime import date, timedelta
 from urllib.parse import urljoin, quote
 
 import httpx
 from bs4 import BeautifulSoup
 
 from collector.base import BaseAdapter, ListItem, RawDoc
+
+
+def _parse_publish_date(date_text: str, today: date | None = None) -> str:
+    """Normalize Sogou's absolute and relative publish-date labels."""
+    today = today or date.today()
+    absolute = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", date_text)
+    if absolute:
+        return f"{absolute.group(1)}-{int(absolute.group(2)):02d}-{int(absolute.group(3)):02d}"
+    if "昨天" in date_text:
+        return (today - timedelta(days=1)).isoformat()
+    relative = re.search(r"(\d+)天前", date_text)
+    if relative:
+        return (today - timedelta(days=int(relative.group(1)))).isoformat()
+    return ""
 
 
 class WechatSearchAdapter(BaseAdapter):
@@ -77,12 +92,9 @@ class WechatSearchAdapter(BaseAdapter):
             publish_date = ""
             date_el = box.select_one("span.s2")
             if date_el:
-                date_text = date_el.get_text(strip=True)
-                m = re.search(r"(\d{4}-\d{2}-\d{2})", date_text)
-                if m:
-                    publish_date = m.group(1)
+                publish_date = _parse_publish_date(date_el.get_text(strip=True))
 
-            if since and publish_date and publish_date < since:
+            if since and (not publish_date or publish_date < since):
                 continue
 
             items.append(ListItem(

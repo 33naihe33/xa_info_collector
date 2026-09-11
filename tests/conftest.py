@@ -19,6 +19,7 @@ _EXEMPT_MODULES = {
     "tests.collector.test_rongcheng",
     "tests.collector.test_anxin",
     "tests.collector.test_hebccw",
+    "tests.collector.test_wechat_search",
 }
 
 # 允许的主机（loopback + test mock）

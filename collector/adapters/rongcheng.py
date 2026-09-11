@@ -5,7 +5,9 @@
 详情正文：div.con#content，标题：div.cont_title，日期：div.rq
 """
 import re
+import subprocess
 from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -32,11 +34,30 @@ class RongchengAdapter(BaseAdapter):
         )
 
     def _get(self, url: str) -> httpx.Response:
+        self._assert_official_host(url)
         self._throttle()
-        resp = self.session.get(url)
+        try:
+            resp = self.session.get(url)
+        except httpx.ConnectError as exc:
+            if "SSLV3_ALERT_HANDSHAKE_FAILURE" not in str(exc):
+                raise
+            result = subprocess.run(
+                ["curl", "--fail", "--silent", "--show-error", "--location", "--max-time", "30", url],
+                check=True,
+                capture_output=True,
+            )
+            resp = httpx.Response(
+                200,
+                content=result.stdout,
+                request=httpx.Request("GET", url),
+            )
         resp.raise_for_status()
         resp.encoding = resp.charset_encoding or "utf-8"
         return resp
+
+    def _assert_official_host(self, url: str) -> None:
+        if urlparse(url).hostname != urlparse(self.BASE).hostname:
+            raise ValueError("URL is not on the official host")
 
     def fetch_list(self, since: str | None = None) -> list[ListItem]:
         list_url = self.config.get("list_url") or "/news/2/10/1.html"

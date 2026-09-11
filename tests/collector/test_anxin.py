@@ -70,3 +70,10 @@ def test_fetch_detail_extracts_title_and_body():
     # 日期来自 "发布时间：YYYY-MM-DD"
     assert raw.publish_date == "2026-07-09"
     assert "\u3000" not in raw.text
+
+
+def test_get_rejects_non_official_host():
+    from collector.adapters.anxin import AnxinAdapter
+
+    with pytest.raises(ValueError, match="official host"):
+        AnxinAdapter()._get("https://example.com/article")

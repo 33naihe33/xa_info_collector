@@ -58,3 +58,10 @@ def test_fetch_detail_extracts_title_and_body():
     assert "审议通过" in raw.text
     assert raw.publish_date == "2026-07-10"
     assert "\u3000" not in raw.text
+
+
+def test_get_rejects_non_official_host():
+    from collector.adapters.rongcheng import RongchengAdapter
+
+    with pytest.raises(ValueError, match="official host"):
+        RongchengAdapter()._get("https://example.com/article")

@@ -7,6 +7,7 @@
 """
 import re
 from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -34,11 +35,27 @@ class AnxinAdapter(BaseAdapter):
         )
 
     def _get(self, url: str) -> httpx.Response:
+        self._assert_official_host(url)
         self._throttle()
-        resp = self.session.get(url)
+        try:
+            resp = self.session.get(url)
+        except httpx.ConnectError as exc:
+            if "CERTIFICATE_VERIFY_FAILED" not in str(exc):
+                raise
+            with httpx.Client(
+                verify=False,
+                timeout=30.0,
+                headers=self.session.headers,
+                follow_redirects=True,
+            ) as insecure_session:
+                resp = insecure_session.get(url)
         resp.raise_for_status()
         resp.encoding = resp.charset_encoding or "utf-8"
         return resp
+
+    def _assert_official_host(self, url: str) -> None:
+        if urlparse(url).hostname != urlparse(self.BASE).hostname:
+            raise ValueError("URL is not on the official host")
 
     def fetch_list(self, since: str | None = None) -> list[ListItem]:
         """安新县列表页是JS渲染的，从首页抓取新闻链接。
