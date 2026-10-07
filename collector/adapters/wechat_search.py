@@ -93,6 +93,13 @@ class WechatSearchAdapter(BaseAdapter):
             date_el = box.select_one("span.s2")
             if date_el:
                 publish_date = _parse_publish_date(date_el.get_text(strip=True))
+                # 搜狗新模板将日期写在 JS 的 timeConvert('Unix秒') 调用中。
+                if not publish_date:
+                    m_ts = re.search(r"timeConvert\('(\d+)'\)", str(date_el))
+                    if m_ts:
+                        from datetime import datetime
+                        publish_date = datetime.fromtimestamp(
+                            int(m_ts.group(1))).strftime("%Y-%m-%d")
 
             if since and (not publish_date or publish_date < since):
                 continue

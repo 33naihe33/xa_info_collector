@@ -35,3 +35,21 @@ def test_fetch_list_since_skips_undated_and_old_items():
     items = XionganFabuAdapter().fetch_list(since="2026-09-05")
 
     assert [item.publish_date for item in items] == ["2026-09-09"]
+
+
+@respx.mock
+def test_fetch_list_parses_sogou_javascript_timestamp_date():
+    respx.get("https://weixin.sogou.com/weixin").respond(
+        text="""
+        <div class="txt-box">
+          <a href="/new">搜狗时间戳文章</a>
+          <span class="s2"><script>document.write(timeConvert('1791332972'))</script></span>
+        </div>
+        """
+    )
+
+    items = XionganFabuAdapter().fetch_list(since="2026-10-01")
+
+    assert [(item.title, item.publish_date) for item in items] == [
+        ("搜狗时间戳文章", "2026-10-07"),
+    ]
