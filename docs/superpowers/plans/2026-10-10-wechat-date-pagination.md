@@ -22,7 +22,7 @@
 ### Task 1: 迁移微信公众号分页配置
 
 **Files:**
-- Modify: `config/sources.yaml:75-122`
+- Modify: `config/sources.yaml:62-93`
 - Modify: `tests/collector/test_config.py`
 
 **Interfaces:**
@@ -83,7 +83,7 @@ Run: `git add config/sources.yaml tests/collector/test_config.py && git commit -
 
 **Interfaces:**
 - Consumes: `WechatSearchAdapter.fetch_list(since: str | None) -> list[ListItem]` 和来源分页配置。
-- Produces: `SogouBlockedError(RuntimeError)`、`SogouInvalidPageError(RuntimeError)`；分页 `fetch_list` 仍返回 `list[ListItem]`。
+- Produces: 分页 `fetch_list(since)`，仍返回 `list[ListItem]`；反爬与无效页面异常在 Task 3 定义。
 
 - [ ] **Step 1: 写第二页、离群旧日期和 URL 去重的失败测试**
 
@@ -98,6 +98,14 @@ PAGE_2 = """
 <div class="txt-box"><a href="/same">同一文章</a><span class="s2"><script>document.write(timeConvert('1791504000'))</script></span></div>
 <div class="txt-box"><a href="/second">第二页文章</a><span class="s2"><script>document.write(timeConvert('1791417600'))</script></span></div>
 """
+
+requested_pages = []
+def search_handler(request):
+    page = request.url.params.get("page")
+    requested_pages.append(page)
+    return httpx.Response(200, text={"1": PAGE_1, "2": PAGE_2}[page])
+
+respx.get("https://weixin.sogou.com/weixin").mock(side_effect=search_handler)
 
 def test_fetch_list_pages_past_single_old_outlier_and_deduplicates_urls():
     adapter = XionganFabuAdapter()
@@ -140,6 +148,7 @@ def _result_limit(self) -> int:
 dated = [item.publish_date for item in page_items if item.publish_date]
 in_range = [item for item in page_items if not since or item.publish_date >= since]
 if since and dated and not any(value >= since for value in dated):
+    # 此页的已解析条目都已越过下界；无日期条目在 since 运行中会被过滤。
     break
 ```
 
@@ -209,14 +218,11 @@ def _assert_search_page(self, response: httpx.Response, soup: BeautifulSoup,
             or "验证码" in response.text):
         raise SogouBlockedError(f"Sogou blocked search page {page}")
     boxes = soup.select("div.txt-box")
-    has_search_shell = soup.select_one("#main, #main_container, #pagebar_container")
     if not boxes and not saw_nonempty_page:
         raise SogouInvalidPageError(f"suspicious_empty_first_page page={page}")
-    if not boxes and not has_search_shell:
-        raise SogouInvalidPageError(f"invalid_page page={page}")
 ```
 
-在发起请求后、解析条目前调用该方法。让 HTTP 5xx 保持 `resp.raise_for_status()` 的现有 `httpx.HTTPStatusError`，不转为 `SogouBlockedError`。为异常日志加入来源与页码；不要吞掉异常或把异常页转换为空数组。
+在发起请求后、解析条目前调用该方法。第 1 页缺少 `div.txt-box` 是明确的 `invalid_page` 信号；已成功解析过非空页后，后续没有 `div.txt-box` 的非阻断响应视为分页穷尽，不使用未经实测的页面壳选择器。让 HTTP 5xx 保持 `resp.raise_for_status()` 的现有 `httpx.HTTPStatusError`，不转为 `SogouBlockedError`。为异常日志加入来源与页码；不要吞掉异常或把异常页转换为空数组。
 
 - [ ] **Step 4: 运行异常、游标及分页全套测试**
 
@@ -228,13 +234,13 @@ Expected: PASS。
 
 Run: `git add collector/adapters/wechat_search.py tests/collector/test_wechat_search.py && git commit -m "fix: preserve cursors on blocked WeChat pages"`
 
-### Task 4: 集成验证与受限补采
+### Task 4: 集成验证（不访问实时站点或生产游标）
 
 **Files:**
 - Modify: none
 
 **Interfaces:**
-- Consumes: Tasks 1–3 和现有 `scripts/backfill_range.py`。
+- Consumes: Tasks 1–3、`CrawlRun` 和 respx fixture。
 - Produces: 经验证的按日期微信公众号采集能力。
 
 - [ ] **Step 1: 运行受影响的完整测试集**
@@ -249,23 +255,13 @@ Run: `conda run -n xa-info-collector pytest -q`
 
 Expected: PASS。
 
-- [ ] **Step 3: 对单个公众号执行受限补采并检查游标**
+- [ ] **Step 3: 在临时 SQLite 中验证阻断时的游标冻结**
 
 Run:
 
-```bash
-PYTHONPATH=. conda run -n xa-info-collector python -c '
-from storage.models import init_db, close_db
-from collector.adapters.wechat_search import XionganFabuAdapter
-init_db()
-try:
-    print(XionganFabuAdapter().run(since="2026-10-08"))
-finally:
-    close_db()
-'
-```
+Run: `conda run -n xa-info-collector pytest tests/collector/test_wechat_search.py::test_antispider_page_fails_run_and_preserves_previous_cursor -v`
 
-Expected: 仅按 5 秒间隔访问至多 5 页；若命中反爬或无效首页，命令非零退出且游标不推进；正常完成时仅保留发布日期不早于 2026-10-08 的文章。
+Expected: PASS。测试以 `init_db(":memory:")` 和本地 respx 响应建立已有游标，模拟 `/antispider/` 后确认运行失败且日常游标保持不变；不访问真实搜狗，也不写生产数据库。实际补采仅在范围运行 `run(since, until)` 落地后进行，避免显式 `since` 的现有 `run()` 写入日常游标。
 
 - [ ] **Step 4: 检查工作区和提交历史**
 
