@@ -192,7 +192,7 @@ def test_antispider_page_fails_run_and_preserves_previous_cursor():
     assert CrawlRun.get_last_crawled_date("wechat_xiongan_fabu") == "2026-10-07"
 ```
 
-新增以下独立测试：`test_fetch_list_rejects_403_and_429_as_blocked`；`test_fetch_list_rejects_antispider_final_url_as_blocked`；`test_first_empty_result_page_is_invalid_and_does_not_advance_cursor`；`test_empty_page_after_nonempty_page_returns_collected_items`；`test_unrecognized_page_is_invalid_but_normal_result_page_is_not`；`test_timeout_or_5xx_uses_existing_request_error_path`。正常结果页负向夹具必须含 `.txt-box`，且无分页容器不得误触发无效页。
+新增以下独立测试：`test_fetch_list_rejects_403_and_429_as_blocked`；`test_fetch_list_rejects_antispider_final_url_as_blocked`；`test_first_empty_result_page_is_invalid_and_does_not_advance_cursor`；`test_marked_empty_page_after_nonempty_page_returns_collected_items`；`test_unrecognized_later_page_is_invalid_and_preserves_cursor`；`test_timeout_or_5xx_uses_existing_request_error_path`。正常空页夹具必须含 `id="noresult_part1_container"` 或正文“没有找到”；后续无 `.txt-box` 但无空态标记的夹具必须断言为无效页。正常结果夹具只需有 1 条或更多 `.txt-box`，不得断言线上页面恰有 10 条。
 
 - [ ] **Step 2: 确认失败测试失败**
 
@@ -209,8 +209,8 @@ class SogouBlockedError(RuntimeError):
 class SogouInvalidPageError(RuntimeError):
     pass
 
-def _assert_search_page(self, response: httpx.Response, soup: BeautifulSoup,
-                        page: int, saw_nonempty_page: bool) -> None:
+def _classify_search_page(self, response: httpx.Response, soup: BeautifulSoup,
+                          page: int, saw_nonempty_page: bool) -> bool:
     lowered = response.text.lower()
     if (response.status_code in (403, 429)
             or "/antispider/" in str(response.url)
@@ -218,11 +218,30 @@ def _assert_search_page(self, response: httpx.Response, soup: BeautifulSoup,
             or "验证码" in response.text):
         raise SogouBlockedError(f"Sogou blocked search page {page}")
     boxes = soup.select("div.txt-box")
-    if not boxes and not saw_nonempty_page:
+    if boxes:
+        return True
+    if not saw_nonempty_page:
         raise SogouInvalidPageError(f"suspicious_empty_first_page page={page}")
+    has_empty_marker = (
+        soup.select_one("#noresult_part1_container, [id*='noresult']")
+        or "没有找到" in soup.get_text(" ", strip=True)
+    )
+    if has_empty_marker:
+        return False
+    raise SogouInvalidPageError(f"invalid_page page={page}")
 ```
 
-在发起请求后、解析条目前调用该方法。第 1 页缺少 `div.txt-box` 是明确的 `invalid_page` 信号；已成功解析过非空页后，后续没有 `div.txt-box` 的非阻断响应视为分页穷尽，不使用未经实测的页面壳选择器。让 HTTP 5xx 保持 `resp.raise_for_status()` 的现有 `httpx.HTTPStatusError`，不转为 `SogouBlockedError`。为异常日志加入来源与页码；不要吞掉异常或把异常页转换为空数组。
+在发起请求后、解析条目前调用该方法：
+
+```python
+# 分页循环之前：saw_nonempty_page = False
+has_results = self._classify_search_page(resp, soup, page, saw_nonempty_page)
+if not has_results:
+    break  # 已确认的正常空结果页；保留前页累计条目。
+saw_nonempty_page = True
+```
+
+第 1 页缺少 `div.txt-box` 是明确的 `invalid_page` 信号；后续页只有命中实测空态标记才视为分页穷尽，其他无 `div.txt-box` 响应仍为无效页。让 HTTP 5xx 保持 `resp.raise_for_status()` 的现有 `httpx.HTTPStatusError`，不转为 `SogouBlockedError`。为异常日志加入来源与页码；不要吞掉异常或把异常页转换为空数组。
 
 - [ ] **Step 4: 运行异常、游标及分页全套测试**
 
@@ -256,8 +275,6 @@ Run: `conda run -n xa-info-collector pytest -q`
 Expected: PASS。
 
 - [ ] **Step 3: 在临时 SQLite 中验证阻断时的游标冻结**
-
-Run:
 
 Run: `conda run -n xa-info-collector pytest tests/collector/test_wechat_search.py::test_antispider_page_fails_run_and_preserves_previous_cursor -v`
 

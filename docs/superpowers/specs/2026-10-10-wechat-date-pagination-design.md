@@ -21,7 +21,7 @@
 
 验证码与正常空页必须区分。响应 URL 含 `/antispider/`、HTTP 403/429，或命中已知验证码页面标记时，适配器记录来源、页码和检测标记后抛出 `SogouBlockedError`，而不是返回空列表。`BaseAdapter.run()` 将该异常记为失败运行并记录列表级 `crawl_errors`；由于没有成功完成运行，`last_crawled_date` 不推进。本轮已抓到但尚未入库的列表结果不作为成功结果提交。
 
-正常空结果页返回空列表，日志记录 `stop_reason=source_exhausted`；运行可正常完成并按既有规则推进游标。非验证码、但响应中同时没有 `div.txt-box` 与搜狗结果/分页容器时，或第 1 页即为空时，记录 `stop_reason=invalid_page`（后者附带 `suspicious_empty_first_page` 标记）并抛出解析异常，同样不推进游标。网络超时和 5xx 保持既有请求异常路径，记录为 `network_error` 并不推进游标。这样各情形可从运行状态与错误记录中区分：`source_exhausted` 为成功且无错误，`blocked` 为失败并带反爬错误，`invalid_page` 为失败并带解析错误，`network_error` 为失败并带请求错误。
+仅在已解析过非空页后，后续页命中已实测的搜狗空态标记（`id="noresult_part1_container"`、其他含 `noresult` 的 id，或正文“没有找到”）时，才返回空列表并记录 `stop_reason=source_exhausted`；运行可正常完成并按既有规则推进游标。非验证码、但没有 `div.txt-box` 且未命中上述空态标记的响应，或第 1 页即为空时，记录 `stop_reason=invalid_page`（后者附带 `suspicious_empty_first_page` 标记）并抛出解析异常，同样不推进游标。网络超时和 5xx 保持既有请求异常路径，记录为 `network_error` 并不推进游标。这样各情形可从运行状态与错误记录中区分：`source_exhausted` 为成功且无错误，`blocked` 为失败并带反爬错误，`invalid_page` 为失败并带解析错误，`network_error` 为失败并带请求错误。
 
 ## 配置
 
