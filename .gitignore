@@ -19,6 +19,7 @@ build/
 # 部署打包排除：生产数据不入库（磁盘保留，仅取消跟踪）
 data/images/
 data/reports/
+data/analysis_runs/
 data/.DS_Store
 .DS_Store
 .zcode/

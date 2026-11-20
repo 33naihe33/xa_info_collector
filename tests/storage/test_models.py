@@ -40,6 +40,28 @@ def test_duplicate_content_hash_raises(db):
         )
 
 
+def test_duplicate_url_leaves_connection_ready_for_error_logging(db):
+    from storage.models import CrawlError, IntegrityError
+
+    Document.create(
+        source="anxin_gov", doc_type="新闻", title="A",
+        url="https://example.com/same", publish_date="2026-10-13",
+        raw_html="", text="first", content_hash="first",
+    )
+    with pytest.raises(IntegrityError):
+        Document.create(
+            source="anxin_gov", doc_type="新闻", title="B",
+            url="https://example.com/same", publish_date="2026-10-13",
+            raw_html="", text="updated", content_hash="updated",
+        )
+
+    CrawlError.log("anxin_gov", "https://example.com/same", "duplicate URL")
+    assert get_db().execute(
+        "SELECT status FROM crawl_errors WHERE source = ? AND url = ?",
+        ("anxin_gov", "https://example.com/same"),
+    ).fetchone()["status"] == "pending"
+
+
 def test_create_and_get_entity(db):
     from storage.models import Entity
     ent = Entity.create(name="雄安集团", entity_type="机构", aliases='["中国雄安集团"]')

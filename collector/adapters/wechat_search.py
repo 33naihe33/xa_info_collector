@@ -23,6 +23,8 @@ def _parse_publish_date(date_text: str, today: date | None = None) -> str:
     absolute = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", date_text)
     if absolute:
         return f"{absolute.group(1)}-{int(absolute.group(2)):02d}-{int(absolute.group(3)):02d}"
+    if "今天" in date_text:
+        return today.isoformat()
     if "昨天" in date_text:
         return (today - timedelta(days=1)).isoformat()
     relative = re.search(r"(\d+)天前", date_text)

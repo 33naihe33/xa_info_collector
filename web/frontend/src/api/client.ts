@@ -49,6 +49,11 @@ export interface CollectStatusResponse {
   source: string
   last_run: CrawlRunInfo | null
 }
+export interface RangeCollectResponse {
+  status: 'started'
+  source_count: number
+  sources: string[]
+}
 
 export interface OpportunityItem {
   id: number
@@ -219,6 +224,7 @@ export const apiClient = {
   getSources: () => api.get<{ sources: SourceInfo[] }>('/collect/sources'),
   getCollectStatus: (source: string) => api.get<CollectStatusResponse>('/collect/status', { params: { source } }),
   triggerCollect: (source: string) => api.post('/collect/trigger', null, { params: { source } }),
+  triggerRangeCollect: (sources: string[], dateFrom: string, dateTo: string) => api.post<RangeCollectResponse>('/collect/range', { sources, date_from: dateFrom, date_to: dateTo }),
   getDocuments: (params: { source?: string; limit?: number; offset?: number }) =>
     api.get<DocumentListResponse>('/documents', { params }),
   getDocument: (id: number) => api.get<DocumentDetail>(`/documents/${id}`),

@@ -15,6 +15,27 @@ from collector.deduper import content_hash, is_duplicate
 from storage.models import Document, CrawlError, CrawlRun
 
 
+def _normalize_publish_date(value: str | None) -> str | None:
+    """Return an ISO calendar date, or None when a list date is unusable."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.strip().replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        try:
+            return datetime.strptime(value.strip()[:10], "%Y-%m-%d").date().isoformat()
+        except ValueError:
+            return None
+
+
+def _validate_date_range(since: str | None, until: str | None) -> None:
+    if until is not None and (
+        since is None or _normalize_publish_date(since) != since
+        or _normalize_publish_date(until) != until or since > until
+    ):
+        raise ValueError("range collection requires valid YYYY-MM-DD bounds with since <= until")
+
+
 @dataclass
 class ListItem:
     title: str
@@ -82,7 +103,8 @@ class BaseAdapter(ABC):
     def fetch_detail(self, url: str) -> RawDoc:
         """抓取详情页正文。每次请求前框架已自动限速。"""
 
-    def _ingest_detail(self, item: ListItem, category: str | None = None) -> IngestResult:
+    def _ingest_detail(self, item: ListItem, category: str | None = None,
+                       *, since: str | None = None, until: str | None = None) -> IngestResult:
         """公共详情入库流程（主抓取与重试共用）。
 
         fetch_detail → 回退 → 去重 → hash → download_images → Document.create → save_snapshot
@@ -98,6 +120,11 @@ class BaseAdapter(ABC):
             raw.title = item.title
         if not raw.publish_date:
             raw.publish_date = item.publish_date
+        if until is not None:
+            publish_date = _normalize_publish_date(raw.publish_date)
+            if not publish_date or publish_date < since or publish_date > until:
+                return IngestResult("skipped")
+            raw.publish_date = publish_date
         # 正文+标题去重
         dedup_text = raw.text or item.title
         if not dedup_text:
@@ -158,7 +185,7 @@ class BaseAdapter(ABC):
                 CrawlError.log(self.source_name, url, str(e), category=category)
         return retried_ok
 
-    def run(self, since: str | None = None) -> dict:
+    def run(self, since: str | None = None, until: str | None = None) -> dict:
         """完整抓取流程：列表 → 详情 → 去重 → 入库。返回统计。
 
         增量爬取：若 since 未指定，自动从 crawl_runs 读取上次成功抓取的
@@ -168,8 +195,11 @@ class BaseAdapter(ABC):
         F-04：运行开头先重试 pending 错误（含 category=None 全局桶），
         主循环复用 _ingest_detail 公共入库流程。
         """
-        # F-04：先排空 pending 错误（全局桶 + 本 source）
-        self._retry_pending(category=None)
+        _validate_date_range(since, until)
+        is_range_run = until is not None
+        # 范围任务没有经列表日期校验的 pending URL，不能重试入库。
+        if not is_range_run:
+            self._retry_pending(category=None)
 
         # 增量：未指定 since 时，读取上次抓取日期
         if since is None:
@@ -183,11 +213,17 @@ class BaseAdapter(ABC):
         try:
             items = self.fetch_list(since=since)
             for item in items:
+                publish_date = _normalize_publish_date(item.publish_date)
+                if is_range_run and (not publish_date or publish_date < since or publish_date > until):
+                    continue
+                if publish_date:
+                    item.publish_date = publish_date
                 # 跳过已标记为死信的URL
                 if item.url and CrawlError.is_dead(self.source_name, item.url):
                     continue
                 try:
-                    result = self._ingest_detail(item)
+                    result = (self._ingest_detail(item, since=since, until=until)
+                              if is_range_run else self._ingest_detail(item))
                     if result.is_new:
                         new_count += 1
                         # 跟踪本次抓取到的最新日期
@@ -201,16 +237,16 @@ class BaseAdapter(ABC):
                 run.finish(
                     new_count=new_count, error_count=error_count,
                     status="success_with_errors",
-                    last_crawled_date=since,  # 保留旧游标
+                    last_crawled_date=None if is_range_run else since,
                 )
             else:
                 run.finish(
                     new_count=new_count, error_count=error_count,
                     status="success",
-                    last_crawled_date=latest_date or None,
+                    last_crawled_date=None if is_range_run else latest_date or None,
                 )
         except Exception as e:
-            run.finish(new_count=new_count, error_count=error_count, status="failed")
+            run.finish(new_count=new_count, error_count=error_count, status="failed", last_crawled_date=None)
             CrawlError.log(self.source_name, None, f"fetch_list failed: {e}")
             raise
 

@@ -7,6 +7,7 @@ export const useCollectorStore = defineStore('collector', () => {
   const sources = ref<SourceInfo[]>([])
   const loading = ref(false)
   const triggerLoading = ref<string | null>(null)
+  const rangeTriggerLoading = ref(false)
 
   async function fetchSources() {
     loading.value = true
@@ -26,6 +27,14 @@ export const useCollectorStore = defineStore('collector', () => {
       triggerLoading.value = null
     }
   }
+  async function triggerRangeCollect(sources: string[], dateFrom: string, dateTo: string) {
+    rangeTriggerLoading.value = true
+    try {
+      return await apiClient.triggerRangeCollect(sources, dateFrom, dateTo)
+    } finally {
+      rangeTriggerLoading.value = false
+    }
+  }
 
-  return { sources, loading, triggerLoading, fetchSources, triggerCollect }
+  return { sources, loading, triggerLoading, rangeTriggerLoading, fetchSources, triggerCollect, triggerRangeCollect }
 })

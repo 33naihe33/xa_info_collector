@@ -18,6 +18,7 @@ def test_parse_publish_date_supports_absolute_and_relative_dates():
     today = date(2026, 9, 11)
 
     assert _parse_publish_date("2026-09-09", today) == "2026-09-09"
+    assert _parse_publish_date("今天", today) == "2026-09-11"
     assert _parse_publish_date("昨天", today) == "2026-09-10"
     assert _parse_publish_date("3天前", today) == "2026-09-08"
 

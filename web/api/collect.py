@@ -1,9 +1,17 @@
 import logging
-from fastapi import APIRouter, BackgroundTasks
+from datetime import date
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel
 from storage.models import CrawlRun
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class RangeCollectRequest(BaseModel):
+    sources: list[str]
+    date_from: date
+    date_to: date
 
 
 def _build_adapter(source: str):
@@ -69,6 +77,34 @@ def trigger_collect(background_tasks: BackgroundTasks, source: str = "xiongan_po
         raise HTTPException(status_code=409, detail="collect already running")
     background_tasks.add_task(_run)
     return {"status": "started", "source": source}
+
+
+@router.post("/collect/range")
+def trigger_range_collect(request: RangeCollectRequest, background_tasks: BackgroundTasks):
+    from collector.config import load_sources_config
+    from web.job_lock import try_acquire_collect, release_collect
+
+    if not request.sources or request.date_from > request.date_to:
+        raise HTTPException(status_code=400, detail="invalid date range or sources")
+    configured = load_sources_config()
+    sources = list(dict.fromkeys(request.sources))
+    if any(name not in configured or not configured[name].get("enabled") for name in sources):
+        raise HTTPException(status_code=400, detail="unknown or disabled source")
+    if not try_acquire_collect():
+        raise HTTPException(status_code=409, detail="collect already running")
+
+    def _run():
+        try:
+            for source in sources:
+                try:
+                    _build_adapter(source).run(since=request.date_from.isoformat(), until=request.date_to.isoformat())
+                except Exception:
+                    logger.exception("Range collect failed for %s", source)
+        finally:
+            release_collect()
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "source_count": len(sources), "sources": sources}
 
 
 @router.get("/collect/status")

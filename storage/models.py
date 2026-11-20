@@ -439,6 +439,7 @@ class Document:
             )
             conn.commit()
         except sqlite3.IntegrityError as e:
+            conn.rollback()
             raise IntegrityError(str(e)) from e
         return cls.get_by_id(cur.lastrowid)
 

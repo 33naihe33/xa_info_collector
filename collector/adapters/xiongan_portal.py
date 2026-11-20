@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
-from collector.base import BaseAdapter, ListItem, RawDoc
+from collector.base import BaseAdapter, ListItem, RawDoc, _normalize_publish_date, _validate_date_range
 
 
 class XionganPortalAdapter(BaseAdapter):
@@ -33,7 +33,7 @@ class XionganPortalAdapter(BaseAdapter):
         resp.raise_for_status()
         return resp
 
-    def run(self, since: str | None = None) -> dict:
+    def run(self, since: str | None = None, until: str | None = None) -> dict:
         """遍历所有配置的栏目进行抓取。每个栏目独立错误隔离。
 
         F-04：栏目循环前先排空 category=None 全局桶（遗留未分类错误），
@@ -41,20 +41,23 @@ class XionganPortalAdapter(BaseAdapter):
         """
         from storage.models import CrawlError
 
+        _validate_date_range(since, until)
         total_new = 0
         total_errors = 0
         categories = self.config.get("categories", {})
 
         # F-04：先排空全局桶（category IS NULL 的遗留错误）
-        self._retry_pending(category=None)
+        if until is None:
+            self._retry_pending(category=None)
 
         for cat_name, cat_cfg in categories.items():
             if not cat_cfg.get("datasource_path"):
                 continue  # 跳过无 datasource 的栏目（如 tzgg）
             try:
                 # 栏目级 pending 重试
-                self._retry_pending(category=cat_name)
-                result = self._run_category(cat_name, cat_cfg, since)
+                if until is None:
+                    self._retry_pending(category=cat_name)
+                result = self._run_category(cat_name, cat_cfg, since, until)
                 total_new += result.get("new", 0)
                 total_errors += result.get("errors", 0)
             except Exception as e:
@@ -64,7 +67,7 @@ class XionganPortalAdapter(BaseAdapter):
 
         return {"new": total_new, "errors": total_errors}
 
-    def _run_category(self, category: str, cat_cfg: dict, since: str | None) -> dict:
+    def _run_category(self, category: str, cat_cfg: dict, since: str | None, until: str | None = None) -> dict:
         """抓取单个栏目（栏目级游标隔离）。"""
         from storage.models import CrawlError, CrawlRun
 
@@ -81,10 +84,16 @@ class XionganPortalAdapter(BaseAdapter):
         try:
             items = self.fetch_list(since=cat_since, category=category)
             for item in items:
+                publish_date = _normalize_publish_date(item.publish_date)
+                if until is not None and (not publish_date or publish_date < cat_since or publish_date > until):
+                    continue
+                if publish_date:
+                    item.publish_date = publish_date
                 if item.url and CrawlError.is_dead(self.source_name, item.url, category=category):
                     continue
                 try:
-                    result = self._ingest_detail(item, category=category)
+                    result = (self._ingest_detail(item, category=category, since=cat_since, until=until)
+                              if until is not None else self._ingest_detail(item, category=category))
                     if result.is_new:
                         new_count += 1
                         if result.publish_date and result.publish_date > latest_date:
@@ -94,12 +103,12 @@ class XionganPortalAdapter(BaseAdapter):
                     error_count += 1
             if error_count > 0:
                 run.finish(new_count=new_count, error_count=error_count,
-                           status="success_with_errors", last_crawled_date=cat_since)
+                           status="success_with_errors", last_crawled_date=None if until is not None else cat_since)
             else:
                 run.finish(new_count=new_count, error_count=error_count,
-                           status="success", last_crawled_date=latest_date or None)
+                           status="success", last_crawled_date=None if until is not None else latest_date or None)
         except Exception as e:
-            run.finish(new_count=new_count, error_count=error_count, status="failed")
+            run.finish(new_count=new_count, error_count=error_count, status="failed", last_crawled_date=None)
             CrawlError.log(self.source_name, None, f"fetch_list failed for {category}: {e}", category=category)
             raise
 

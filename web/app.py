@@ -38,8 +38,8 @@ def _setup_scheduler():
     """配置 APScheduler 定时任务。
 
     任务计划：
-    - 每日凌晨 6:00 抓取全部启用的数据源
-    - 每日凌晨 6:30 分析未处理文档（抓取完成后留 30 分钟）
+    - 每日 10:00、14:00、17:00 增量抓取全部启用的数据源并分析
+    - 每日 10:30、14:30、17:30 补充分析未处理文档
     """
     import os
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -47,18 +47,18 @@ def _setup_scheduler():
 
     scheduler = BackgroundScheduler()
 
-    # 每天 12:00 增量爬取 + 分析（合并为一个任务，先爬取后分析）
+    # 每天 10:00、14:00、17:00 增量爬取 + 分析（先爬取后分析）
     scheduler.add_job(
         _scheduled_crawl_and_analyze,
-        CronTrigger(hour=12, minute=0),
+        CronTrigger(hour="10,14,17", minute=0),
         id="daily_crawl_analyze",
         replace_existing=True,
         misfire_grace_time=3600,
     )
-    # P0-02：独立的分析 job（12:30），确保即使当天无新文档也能消化到期 retryable backlog
+    # P0-02：独立的分析 job（10:30、14:30、17:30），消化到期 retryable backlog
     scheduler.add_job(
         _scheduled_analyze,
-        CronTrigger(hour=12, minute=30),
+        CronTrigger(hour="10,14,17", minute=30),
         id="daily_analyze",
         replace_existing=True,
         misfire_grace_time=3600,
@@ -81,12 +81,12 @@ def _setup_scheduler():
     )
 
     scheduler.start()
-    logger.info("APScheduler started: daily_crawl_analyze@12:00, daily_analyze@12:30, digest_poll@*/30min, weekly_digest@Mon08:30")
+    logger.info("APScheduler started: daily_crawl_analyze@10:00,14:00,17:00, daily_analyze@10:30,14:30,17:30, digest_poll@every_minute, weekly_digest@Mon08:30")
     return scheduler
 
 
 def _scheduled_crawl_and_analyze():
-    """定时任务：每天 12:00 增量爬取全部数据源 + 分析新文档。
+    """定时任务：每天 10:00、14:00、17:00 增量爬取全部数据源 + 分析新文档。
 
     P1-10：与手动 trigger 互斥（collect + analyze 锁）。
     """
